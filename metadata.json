@@ -1,0 +1,6 @@
+{
+  "name": "ApostaReal Casino",
+  "description": "Sistema completo de casinos con recupero de pérdidas, apuestas deportivas en vivo, quinielas locales con firmas de consentimiento legal y juego responsable.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
