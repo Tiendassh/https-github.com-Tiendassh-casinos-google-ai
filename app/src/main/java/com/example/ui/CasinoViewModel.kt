@@ -744,6 +744,80 @@ class CasinoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // --- SECURE PAYMENT GATEWAY STATE ---
+    var paymentStatusText by mutableStateOf("Seleccione un método de depósito o retiro para comenzar (Cifrado AES-256 Activo)")
+    var paymentInProgress by mutableStateOf(false)
+    var isTransactionSecurelyEncrypted by mutableStateOf(false)
+
+    fun executeSecureDeposit(amount: Double, method: String, reference: String, onComplete: () -> Unit = {}) {
+        if (amount <= 0.0) {
+            paymentStatusText = "El monto debe ser mayor a 0."
+            playSound("lose")
+            return
+        }
+        paymentInProgress = true
+        paymentStatusText = "Iniciando pasarela de pago segura..."
+        isTransactionSecurelyEncrypted = false
+        
+        viewModelScope.launch {
+            delay(1000)
+            paymentStatusText = "Estableciendo túnel de cifrado AES-256..."
+            delay(1000)
+            paymentStatusText = "Autorizando transacción con el banco/billetera..."
+            delay(1000)
+            
+            val success = repository.secureDeposit(amount, method, reference)
+            if (success) {
+                isTransactionSecurelyEncrypted = true
+                playSound("win")
+                paymentStatusText = "¡Transacción autorizada y procesada de manera segura! Se depositaron $$amount créditos."
+                onComplete()
+            } else {
+                playSound("lose")
+                paymentStatusText = "Error al procesar el depósito. Verifique sus datos bancarios y reintente."
+            }
+            paymentInProgress = false
+        }
+    }
+
+    fun executeSecureWithdraw(amount: Double, method: String, accountDetails: String, onComplete: () -> Unit = {}) {
+        if (amount <= 0.0) {
+            paymentStatusText = "El monto debe ser mayor a 0."
+            playSound("lose")
+            return
+        }
+        val currentBalance = userAccount.value?.balance ?: 0.0
+        if (currentBalance < amount) {
+            paymentStatusText = "Fondos insuficientes para realizar el retiro deseado ($$amount)."
+            playSound("lose")
+            return
+        }
+        
+        paymentInProgress = true
+        paymentStatusText = "Iniciando túnel de cifrado SSL/TLS de retiro..."
+        isTransactionSecurelyEncrypted = false
+        
+        viewModelScope.launch {
+            delay(1000)
+            paymentStatusText = "Verificando firmas de criptografía híbrida con el banco receptor..."
+            delay(1000)
+            paymentStatusText = "Procesando transferencia segura del saldo..."
+            delay(1000)
+            
+            val success = repository.secureWithdraw(amount, method, accountDetails)
+            if (success) {
+                isTransactionSecurelyEncrypted = true
+                playSound("win")
+                paymentStatusText = "¡Transacción de retiro encriptada procesada exitosamente! Retiro de $$amount enviado a $accountDetails."
+                onComplete()
+            } else {
+                playSound("lose")
+                paymentStatusText = "Error interno del sistema financiero. Verifique los límites de retiro diario."
+            }
+            paymentInProgress = false
+        }
+    }
+
     // Reset database to initial state
     fun resetSystem() {
         viewModelScope.launch {

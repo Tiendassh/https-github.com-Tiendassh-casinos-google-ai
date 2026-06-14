@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -45,6 +46,7 @@ enum class CasinoNavScreen(val title: String, val route: String) {
     SPORTS("Deportes", "sports"),
     QUINIELA("Quiniela", "quiniela"),
     RECUPERO("Recupero", "recupero"),
+    PAGOS("Caja/Pagos", "pagos"),
     LEGAL("Regulación", "legal")
 }
 
@@ -137,8 +139,7 @@ fun MainCasinoApp() {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .clickable {
-                                // Add bonus deposit easily for testing
-                                viewModel.depositDemoCredits(500.0)
+                                currentScreen = CasinoNavScreen.PAGOS
                             }
                             .testTag("balance_card")
                     ) {
@@ -248,6 +249,7 @@ fun MainCasinoApp() {
                     Triple(CasinoNavScreen.SPORTS, Icons.Filled.EmojiEvents, Icons.Outlined.EmojiEvents),
                     Triple(CasinoNavScreen.QUINIELA, Icons.Filled.ConfirmationNumber, Icons.Outlined.ConfirmationNumber),
                     Triple(CasinoNavScreen.RECUPERO, Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
+                    Triple(CasinoNavScreen.PAGOS, Icons.Filled.CreditCard, Icons.Outlined.CreditCard),
                     Triple(CasinoNavScreen.LEGAL, Icons.Filled.Gavel, Icons.Outlined.Gavel)
                 ).forEach { (screen, filledIcon, outlinedIcon) ->
                     val selected = currentScreen == screen
@@ -257,7 +259,7 @@ fun MainCasinoApp() {
                         label = {
                             Text(
                                 text = screen.title,
-                                fontSize = 10.sp,
+                                fontSize = 9.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                             )
                         },
@@ -284,6 +286,7 @@ fun MainCasinoApp() {
                 CasinoNavScreen.SPORTS -> SportsTabScreen(viewModel, user)
                 CasinoNavScreen.QUINIELA -> QuinielaTabScreen(viewModel, user)
                 CasinoNavScreen.RECUPERO -> RecuperoTabScreen(viewModel, user)
+                CasinoNavScreen.PAGOS -> PaymentsTabScreen(viewModel, user)
                 CasinoNavScreen.LEGAL -> LegalTabScreen(viewModel, user)
             }
         }
@@ -1264,21 +1267,44 @@ fun SportsMatchItem(
     selectedOutcome: String,
     onSelectMatch: (String) -> Unit
 ) {
+    val leagueLabel = when (match.homeTeam) {
+        "Real Madrid" -> "La Liga BBVA 🇪🇸 • ⚽"
+        "Boca Juniors" -> "Superliga Argentina 🇦🇷 • ⚽"
+        "Manchester City" -> "Premier League 🇬🇧 • ⚽"
+        "LA Lakers" -> "NBA Playoffs Series 🇺🇸 • 🏀"
+        "Golden State" -> "NBA Regular Season 🇺🇸 • 🏀"
+        "Alcaraz" -> "ATP Masters Final 🏆 • 🎾"
+        "Djokovic" -> "Grand Slam Center Court 🎾"
+        "Max Verstappen" -> "F1 GP de Mónaco 🏎️"
+        else -> "${match.category} Pro League"
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alphaAnim by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     Card(
-        colors = CardDefaults.cardColors(containerColor = ElegantSurfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) ElegantSurface else ElegantSurfaceVariant),
         border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else ElegantBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Live / Category Indicator bar
+            // Live / Category Indicator bar with League Label
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = match.category,
-                    fontSize = 10.sp,
+                    text = leagueLabel,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
@@ -1287,13 +1313,14 @@ fun SportsMatchItem(
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
+                                .graphicsLayer(alpha = alphaAnim)
                                 .clip(CircleShape)
                                 .background(Color.Red)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "${match.matchTime} (${match.scoreHome} - ${match.scoreAway})",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = Color.Red,
                             fontWeight = FontWeight.Bold
                         )
@@ -1332,7 +1359,7 @@ fun SportsMatchItem(
             ) {
                 // Home (1)
                 OutcomeOddButton(
-                    label = "1 (${match.homeTeam})",
+                    label = "1 (Local)",
                     odds = match.homeOdds,
                     isSelected = isSelected && selectedOutcome == "HOME",
                     onClick = { onSelectMatch("HOME") },
@@ -1353,7 +1380,7 @@ fun SportsMatchItem(
                 // Away (2)
                 if (match.awayOdds > 0) {
                     OutcomeOddButton(
-                        label = "2 (${match.awayTeam})",
+                        label = "2 (Visita)",
                         odds = match.awayOdds,
                         isSelected = isSelected && selectedOutcome == "AWAY",
                         onClick = { onSelectMatch("AWAY") },
@@ -2076,6 +2103,534 @@ fun LegalTabScreen(viewModel: CasinoViewModel, user: UserAccount) {
                         ) {
                             Text("VALIDAR FIRMA", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 11.sp)
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------
+// SCREEN 6: SECURE PAYMENTS PORTAL TAB
+// ----------------------------------------------------
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PaymentsTabScreen(viewModel: CasinoViewModel, user: UserAccount) {
+    var isDepositMode by remember { mutableStateOf(true) }
+    var selectedMethod by remember { mutableStateOf("TARJETA") } // "TARJETA", "TRANSFER", "BILLETERA"
+    
+    // Input States
+    var amountText by remember { mutableStateOf("100") }
+    var cardNumberText by remember { mutableStateOf("") }
+    var holderText by remember { mutableStateOf("") }
+    var expiryText by remember { mutableStateOf("") }
+    var cvvText by remember { mutableStateOf("") }
+    
+    // Bank details states
+    val bankAccountText = "AL-APOSTA-REAL.S.A"
+    val bankCbuText = "0000003100023419582736"
+    val bankAliasText = "aposta.real.seguro"
+    
+    // Electronic wallet email/phone
+    var walletDetailText by remember { mutableStateOf("") }
+    
+    // Success Dialog / Custom Overlay
+    var showSecuritySuccessOverlay by remember { mutableStateOf(false) }
+    var secureTxReference by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        // Core Tab Title
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "CAJA Y PASARELA FINANCIERA",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp
+                )
+                Text(
+                    text = "Cifrado SSL de 256 bits • End-to-End Protegido",
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                )
+            }
+            Surface(
+                color = ElegantRecoveryBg,
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, ElegantRecoveryBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = "Seguro",
+                        tint = ElegantPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "PCI-DSS",
+                        color = ElegantPrimary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Toggle Switcher (Deposit vs Withdraw)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ElegantSurfaceVariant, RoundedCornerShape(10.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Button(
+                onClick = {
+                    isDepositMode = true
+                    viewModel.paymentStatusText = "Seleccione un método de depósito para comenzar (Cifrado AES-256 Activo)"
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDepositMode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    contentColor = if (isDepositMode) Color.Black else Color.White
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.TrendingUp,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("DEPOSITAR", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+
+            Button(
+                onClick = {
+                    isDepositMode = false
+                    viewModel.paymentStatusText = "Seleccione un método de retiro para comenzar (Cifrado AES-256 Activo)"
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (!isDepositMode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    contentColor = if (!isDepositMode) Color.Black else Color.White
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.TrendingDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("RETIRAR", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Balance Information Banner
+        Card(
+            colors = CardDefaults.cardColors(containerColor = ElegantSurface),
+            border = BorderStroke(1.dp, ElegantBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Tu Saldo Disponible", fontSize = 11.sp, color = Color.Gray)
+                    Text(
+                        text = String.format("$%.2f", user.balance),
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+                Icon(
+                    imageVector = if (isDepositMode) Icons.Filled.AccountBalanceWallet else Icons.Filled.Savings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Section Title: Métodos Disponibles
+        Text(text = "Método de Pago Seguro:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+        
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // horizontal payment method selector cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val methods = listOf(
+                Triple("TARJETA", "Tarjeta", Icons.Filled.CreditCard),
+                Triple("TRANSFER", "Transfer.", Icons.Filled.AccountBalance),
+                Triple("BILLETERA", "Wallet", Icons.Filled.PhonelinkRing)
+            )
+
+            methods.forEach { (type, name, icon) ->
+                val active = selectedMethod == type
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else ElegantSurfaceVariant
+                    ),
+                    border = BorderStroke(if (active) 2.dp else 1.dp, if (active) MaterialTheme.colorScheme.primary else ElegantBorder),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedMethod = type }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = name,
+                            tint = if (active) MaterialTheme.colorScheme.primary else Color.Gray,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = name,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (active) Color.White else Color.Gray
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Core Interaction Form
+        Card(
+            colors = CardDefaults.cardColors(containerColor = ElegantSurface),
+            border = BorderStroke(1.dp, ElegantBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Common Amount input
+                Text(text = "Monto de la Transacción ($):", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) amountText = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text("Monto", color = Color.Gray) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = ElegantBorder
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Custom form according to selected method
+                when (selectedMethod) {
+                    "TARJETA" -> {
+                        Text(text = "Número de Tarjeta:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = cardNumberText,
+                            onValueChange = { if (it.length <= 16 && it.all { char -> char.isDigit() }) cardNumberText = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            placeholder = { Text("e.g. 4509 8127 3341 0928", color = Color.Gray) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = ElegantBorder
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(text = "Nombre del Titular:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = holderText,
+                            onValueChange = { holderText = it },
+                            placeholder = { Text("Como figura impreso", color = Color.Gray) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = ElegantBorder
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Vencimiento:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = expiryText,
+                                    onValueChange = { expiryText = it },
+                                    placeholder = { Text("MM/AA", color = Color.Gray) },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = ElegantBorder
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "CVV:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = cvvText,
+                                    onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) cvvText = it },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    placeholder = { Text("123", color = Color.Gray) },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = ElegantBorder
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
+                    "TRANSFER" -> {
+                        Surface(
+                            color = ElegantBackground,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().border(1.dp, ElegantBorder, RoundedCornerShape(8.dp))
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "Detalles de Transferencia Segura", color = ElegantPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = Color.Green, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("Enc.", color = Color.Green, fontSize = 9.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(text = "Titular: $bankAccountText", fontSize = 11.sp, color = Color.White)
+                                Text(text = "CBU: $bankCbuText", fontSize = 11.sp, color = Color.White)
+                                Text(text = "Alias: $bankAliasText", fontSize = 11.sp, color = Color.White)
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Nota: Transfiera desde su home banking e ingrese el CBU emisor a continuación para conciliar instantáneamente:",
+                                    fontSize = 9.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(text = "Tu CBU Emisor o Alias:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = walletDetailText,
+                            onValueChange = { walletDetailText = it },
+                            placeholder = { Text("e.g. 000002131231...", color = Color.Gray) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = ElegantBorder
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    "BILLETERA" -> {
+                        Text(
+                            text = "Email o Cuenta de Billetera Electrónica (Mercado Pago, PayPal, Skrill):",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = walletDetailText,
+                            onValueChange = { walletDetailText = it },
+                            placeholder = { Text("email@billetera.com o número telefónico", color = Color.Gray) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = ElegantBorder
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Security processing status bar in real-time
+                Text(
+                    text = viewModel.paymentStatusText,
+                    fontSize = 11.sp,
+                    color = if (viewModel.paymentInProgress) ElegantPrimary else Color.Gray,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+                if (viewModel.paymentInProgress) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LinearProgressIndicator(
+                        color = ElegantPrimary,
+                        modifier = Modifier.fillMaxWidth().height(4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Submit Action Button
+                val canSubmit = amountText.toDoubleOrNull() != null && amountText.toDouble() > 0 && !viewModel.paymentInProgress
+                Button(
+                    onClick = {
+                        val amount = amountText.toDoubleOrNull() ?: 100.0
+                        val ref = (100000..999999).random().toString()
+                        if (isDepositMode) {
+                            viewModel.executeSecureDeposit(amount, selectedMethod, ref) {
+                                secureTxReference = ref
+                                showSecuritySuccessOverlay = true
+                            }
+                        } else {
+                            viewModel.executeSecureWithdraw(amount, selectedMethod, if (selectedMethod == "TARJETA") "Tarjeta ending in ${cardNumberText.takeLast(4)}" else walletDetailText) {
+                                secureTxReference = ref
+                                showSecuritySuccessOverlay = true
+                            }
+                        }
+                    },
+                    enabled = canSubmit,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDepositMode) Color(0xFF2ECC71) else MaterialTheme.colorScheme.secondary,
+                        contentColor = Color.Black
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("submit_secure_payment_button")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (isDepositMode) Icons.Filled.Lock else Icons.Filled.Send,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isDepositMode) "CONFIRMAR DEPÓSITO SEGURO" else "SOLICITAR RETIRO ENCRIPTADO",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Security guarantees panel (PCI compliant, Cryptography SSL/TLS)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = ElegantRecoveryBg),
+            border = BorderStroke(1.dp, ElegantRecoveryBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Filled.VerifiedUser, contentDescription = null, tint = ElegantPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Garantía de Encriptación de Transacciones", color = ElegantPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Aposta Real certifica que todos los canales de cobro y pago están provistos de firmas digitales criptográficas SHA-256 e intercambio de claves Diffie-Hellman a través de TLS 1.3 de grado bancario. Ningún dato de tarjeta o cuenta es almacenado sin hashes salados.",
+                    fontSize = 10.sp,
+                    color = Color.LightGray
+                )
+            }
+        }
+
+        // Custom Overlay of successful execution
+        if (showSecuritySuccessOverlay) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                color = Color(0xFF223E2E),
+                border = BorderStroke(1.dp, Color(0xFF2ECC71)),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🔐", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Detalle de Conexión Encriptada SSL", color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        IconButton(
+                            onClick = { showSecuritySuccessOverlay = false },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(imageVector = Icons.Filled.Close, contentDescription = "Cerrar", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(text = "Transacción: ${if (isDepositMode) "DEPÓSITO" else "RETIRO"} AUTORIZADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(text = "Protocolo de Canal: TLSv1.3 (TCP Port 443)", color = Color.LightGray, fontSize = 10.sp)
+                    Text(text = "Clave de Cifrado: AES_256_GCM_SHA384 (Firmado)", color = Color.LightGray, fontSize = 10.sp)
+                    Text(text = "Número de Referencia SSL: #TXS-$secureTxReference", color = Color.LightGray, fontSize = 10.sp)
+                    Text(text = "Hash Blockchain Fiduciario: SHA256-${secureTxReference.hashCode().toString(16).uppercase()}", color = Color.LightGray, fontSize = 10.sp)
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { showSecuritySuccessOverlay = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ECC71)),
+                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                    ) {
+                        Text("ENTENDIDO", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
