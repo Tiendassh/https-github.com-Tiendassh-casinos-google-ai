@@ -1,0 +1,107 @@
+# Guía de Despliegue de React en Railway sin Errores 🚀
+
+Esta carpeta contiene un panel de usuario de React completo configurado con **Vite**, **Tailwind CSS**, y componentes de diseño de alta gama que replican la estética del casino.
+
+A continuación, tienes las instrucciones detalladas para desplegar este frontend en tu cuenta de Railway y conectarlo perfectamente con tu backend.
+
+---
+
+## 🏗️ Paso 1: Elegir cómo desplegar en Railway
+
+Tienes dos formas recomendadas de organizar tu proyecto en Railway:
+
+### Opción A (Recomendada): Servicios Separados (Multi-Service)
+Mantienes el Backend en un servicio y el Frontend (este React) en otro servicio dentro del mismo proyecto de Railway.
+
+1. Sube esta carpeta (`react-frontend`) a su propio repositorio de GitHub (o haz un "subfolder deployment" en tu repositorio).
+2. En tu panel de Railway, haz clic en **+ New** > **GitHub Repo** y selecciona tu repositorio de React.
+3. Railway detectará automáticamente que es un proyecto de Node.js (Vite) y usará la configuración de puertos adecuada.
+
+### Opción B: Servir React desde tu Servidor Backend actual
+Si quieres tener **un solo servicio** en Railway para ahorrar recursos, puedes compilar React y hacer que tu backend de Node sirva los archivos.
+1. Compila el frontend localmente ejecutando `npm run build`. Esto generará una carpeta `dist`.
+2. Mueve la carpeta `dist` al directorio de tu backend.
+3. En el archivo principal de tu backend (por ejemplo, `server.js` o `index.js`), agrega la directiva para servir estáticos:
+   ```javascript
+   const express = require('express');
+   const path = require('path');
+   const app = express();
+
+   // Servir archivos estáticos del build de React
+   app.use(express.static(path.join(__dirname, 'dist')));
+
+   // Redireccionar cualquier otra ruta a index.html (evita el error 404 de React Router)
+   app.get('*', (req, res) => {
+     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+   });
+
+   const PORT = process.env.PORT || 3000;
+   app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
+   ```
+
+---
+
+## 🔑 Paso 2: Solución de Problemas Comunes en Railway
+
+### 1. El error de Pantalla en Blanco / Puerto Incorrecto
+Vite por defecto corre en el puerto 5173, pero **Railway exige que tu aplicación escuche en el puerto que le asigne dinámicamente mediante la variable de entorno `$PORT`**.
+
+* **Solución aplicada:** Ya incluimos la configuración dinámica en `vite.config.js`:
+  ```javascript
+  preview: {
+    port: process.env.PORT ? parseInt(process.env.PORT) : 4173,
+    host: '0.0.0.0'
+  }
+  ```
+  Asegúrate de que en las **Variables de Entorno (Variables)** de tu servicio en Railway, se use el comando de inicio (`start`):
+  ```bash
+  npm run start
+  ```
+  *(Definido en tu `package.json` para ejecutar `vite preview --port $PORT --host 0.0.0.0`).*
+
+### 2. Controlar CORS (Cross-Origin Resource Sharing)
+Si usas la **Opción A** (servicios separados), tu frontend (ej. `casinos-real.up.railway.app`) intentará hacer peticiones a tu backend (`casinos-google-ai-production.up.railway.app`). El navegador lo bloqueará a menos que declares CORS en tu backend.
+
+* **Solución en tu Backend (Node/Express):**
+  Instala el paquete `cors`:
+  ```bash
+  npm install cors
+  ```
+  E impleméntalo al inicio de tus rutas:
+  ```javascript
+  const cors = require('cors');
+  app.use(cors({
+    origin: '*', // O la URL específica de tu frontend de Railway
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+  ```
+
+### 3. Evitar errores de recarga (404 Not Found)
+Si usas rutas avanzadas en React y el usuario presiona "F5" o recarga la página, Railway podría devolver un error 404 porque busca un archivo físico en esa ruta.
+
+* **Solución si usas servicios separados:** Agrega un archivo llamado `_redirects` dentro de la carpeta `public/` (o directamente en `dist/` al compilar) con esta única línea:
+  ```text
+  /*    /index.html   200
+  ```
+  Esto le indica al hosting que dirija todas las URLs virtuales al ruteador de React.
+
+---
+
+## 🛠️ Comandos Útiles
+
+Para probar y preparar tu proyecto localmente antes de desplegar:
+
+```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
+npm run dev
+
+# Compilar para producción (genera la carpeta dist/)
+npm run build
+
+# Previsualizar el build de producción localmente
+npm run preview
+```

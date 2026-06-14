@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Pulse animation for Live matches */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.pulse-glow {
+  animation: pulseGlow 1s infinite alternate;
+}
+
+/* Custom styles for matching the Android design dark elegant slate theme */
+.elegant-card {
+  @apply bg-[#15191E] border border-slate-800 rounded-xl shadow-xl transition-all duration-200 hover:border-slate-700;
+}
+
+.elegant-button-primary {
+  @apply bg-[#FFD700] hover:bg-[#E6C200] text-[#000000] font-bold px-4 py-2 rounded-lg transition-transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.elegant-button-secondary {
+  @apply bg-[#2A313C] hover:bg-[#374151] text-slate-100 font-semibold px-4 py-2 rounded-lg transition-transform active:scale-[0.98];
+}
